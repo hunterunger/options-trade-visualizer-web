@@ -10,6 +10,7 @@ import {
     XAxis,
     YAxis,
 } from "recharts";
+import type { TooltipProps } from "recharts";
 import type { VolatilitySmilePoint } from "@/types/options";
 
 interface VolatilitySmileChartProps {
@@ -38,6 +39,24 @@ const buildSeries = (points: VolatilitySmilePoint[]) => {
 
 const percentFormatter = (value: number) => `${value.toFixed(2)}%`;
 
+type TooltipValue = number;
+type TooltipLabel = string;
+
+const tooltipFormatter: TooltipProps<TooltipValue, TooltipLabel>["formatter"] = (
+    value,
+    name,
+    payload,
+) => {
+    if (typeof value !== "number") {
+        return [value ?? "", name ?? ""];
+    }
+
+    const dataKey = payload?.dataKey;
+    const resolvedLabel = dataKey === "rv" ? "Realized Vol" : name ?? "";
+
+    return [`${value.toFixed(2)}%`, resolvedLabel];
+};
+
 export const VolatilitySmileChart = ({ data, realizedVolatility }: VolatilitySmileChartProps) => {
     const baseSeries = buildSeries(data);
     const realizedPercent = typeof realizedVolatility === "number" ? realizedVolatility * 100 : undefined;
@@ -62,14 +81,7 @@ export const VolatilitySmileChart = ({ data, realizedVolatility }: VolatilitySmi
                         fontSize={12}
                     />
                     <Tooltip
-                        formatter={(value: number | string | undefined, name: string, payload) => {
-                            if (typeof value !== "number") {
-                                return [value ?? "", name];
-                            }
-
-                            const label = payload?.dataKey === "rv" ? "Realized Vol" : name === "Calls" ? "Call IV" : "Put IV";
-                            return [`${value.toFixed(2)}%`, label];
-                        }}
+                        formatter={tooltipFormatter}
                         labelFormatter={(label) => `Strike $${label}`}
                         contentStyle={{
                             backgroundColor: "hsla(var(--popover) / 0.93)",
