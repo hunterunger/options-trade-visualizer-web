@@ -2,6 +2,7 @@ import ContractPriceGrid from "@/components/options/contract-price-grid";
 import SentimentChart from "@/components/options/sentiment-chart";
 import UnderlyingSelect from "@/components/options/underlying-select";
 import ExpiryTimeHint from "@/components/options/expiry-time-hint";
+import { getLatestSnapshotForUnderlying } from "@/lib/repositories/option-snapshots";
 import {
     buildContractGrid,
     fetchAllMarkPrices,
@@ -35,7 +36,14 @@ export default async function CryptoStats({ searchParams }: PageProps) {
 
     const { symbols } = await fetchExchangeInfo();
     const underlyings = Array.from(new Set(symbols.map((s) => s.underlying))).sort();
-    const expiries = uniqueExpiriesForUnderlying(symbols, underlying);
+
+    // Prefer Firestore snapshot data when available
+    const snapshot = await getLatestSnapshotForUnderlying(underlying);
+
+    // Use expiries from snapshot if present, else derive from exchangeInfo
+    const expiries = snapshot?.expiries?.length
+        ? [...snapshot.expiries].sort((a, b) => a - b)
+        : uniqueExpiriesForUnderlying(symbols, underlying);
     const selectedExpiry = expiries.length
         ? toNum(toStringParam(params.expiry as any, String(expiries[0] ?? ""))) ?? expiries[0]
         : undefined;
@@ -56,10 +64,47 @@ export default async function CryptoStats({ searchParams }: PageProps) {
         );
     }
 
-    const grid = buildContractGrid(symbols, underlying, selectedExpiry);
-    const markEntries: MarkPriceEntry[] = await fetchAllMarkPrices();
-    const priceBySymbol = new Map(markEntries.map((m) => [m.symbol, m.markPrice] as const));
-    const markBySymbolFull = new Map(markEntries.map((m) => [m.symbol, m] as const));
+    // Build symbol source: snapshot symbols if available, else exchangeInfo symbols
+    const symbolsSource = snapshot
+        ? snapshot.symbols.map((s) => ({
+            symbol: s.symbol,
+            underlying: s.underlying,
+            strikePrice: s.strikePrice,
+            side: s.side,
+            expiryDate: s.expiryDate,
+            unit: s.unit,
+        }))
+        : symbols;
+
+    const grid = buildContractGrid(symbolsSource, underlying, selectedExpiry);
+
+    // Live mark/greeks for overlay (and primary data when snapshot missing)
+    const liveMarkEntries: MarkPriceEntry[] = await fetchAllMarkPrices();
+    const priceBySymbolLive = new Map(liveMarkEntries.map((m) => [m.symbol, m.markPrice] as const));
+    const markBySymbolLive = new Map(liveMarkEntries.map((m) => [m.symbol, m] as const));
+
+    // Snapshot mark/greeks when available; fall back to live set for grid rendering
+    const snapshotMarkEntries: MarkPriceEntry[] | null = snapshot
+        ? snapshot.symbols.map((s) => ({
+            symbol: s.symbol,
+            markPrice: s.markPrice,
+            bidIV: s.bidIV,
+            askIV: s.askIV,
+            markIV: s.markIV,
+            delta: s.delta,
+            theta: s.theta,
+            gamma: s.gamma,
+            vega: s.vega,
+        }))
+        : null;
+    const markEntriesForGrid = snapshotMarkEntries ?? liveMarkEntries;
+    const priceBySymbol = new Map(markEntriesForGrid.map((m) => [m.symbol, m.markPrice] as const));
+    const markBySymbolSnapshot = snapshotMarkEntries
+        ? new Map(snapshotMarkEntries.map((m) => [m.symbol, m] as const))
+        : null;
+    const priceBySymbolSnapshot = snapshotMarkEntries
+        ? new Map(snapshotMarkEntries.map((m) => [m.symbol, m.markPrice] as const))
+        : null;
 
     const rows = grid.map((g) => ({
         strike: g.strike,
@@ -76,38 +121,66 @@ export default async function CryptoStats({ searchParams }: PageProps) {
     })}`;
 
     // Compute sentiment across expiries
-    const indexPrice = await fetchIndexPrice(underlying);
-    const oiBySymbol = new Map<string, number>();
-    // Try to enrich with OI for each expiry (gracefully skip on failure)
+    const indexPriceSnapshot = snapshot?.indexPrice ?? null;
+    const liveIndexPrice = await fetchIndexPrice(underlying);
+
+    // Live open interest map for overlay metrics
+    const oiBySymbolLive = new Map<string, number>();
     for (const e of expiries) {
         try {
             const yyMMdd = formatExpiryToYyMmDd(e);
             const oi = await fetchOpenInterest(underlying.replace("USDT", ""), yyMMdd);
             for (const o of oi) {
-                oiBySymbol.set(o.symbol, o.sumOpenInterest);
+                oiBySymbolLive.set(o.symbol, o.sumOpenInterest);
             }
         } catch { }
     }
 
     const sentimentPoints = expiries.map((e) => {
-        const g = buildContractGrid(symbols, underlying, e);
-        const sOi = computeSentimentForExpiry(g, priceBySymbol, indexPrice, oiBySymbol);
-        const sBase = computeSentimentForExpiry(g, priceBySymbol, indexPrice, undefined);
-        const rr = computeRR25ForExpiry(g, markBySymbolFull);
-        const gex = computeDealerGexForExpiry(
-            g,
-            markBySymbolFull,
-            oiBySymbol,
-            indexPrice,
+        const label = new Date(e).toLocaleDateString(undefined, { month: "short", day: "2-digit" });
+
+        // Snapshot-derived metrics (if available)
+        const gridSnapshot = markBySymbolSnapshot ? buildContractGrid(symbolsSource, underlying, e) : null;
+        const snapshotBase = gridSnapshot && markBySymbolSnapshot && priceBySymbolSnapshot && indexPriceSnapshot != null
+            ? computeSentimentForExpiry(gridSnapshot, priceBySymbolSnapshot, indexPriceSnapshot, undefined)
+            : null;
+        const snapshotRR = gridSnapshot && markBySymbolSnapshot ? computeRR25ForExpiry(gridSnapshot, markBySymbolSnapshot) : { rr25: null };
+        const snapshotGex = gridSnapshot && markBySymbolSnapshot && indexPriceSnapshot != null
+            ? computeDealerGexForExpiry(
+                gridSnapshot,
+                markBySymbolSnapshot,
+                undefined,
+                indexPriceSnapshot,
+                new Map(symbolsSource.map((s) => [s.symbol, s.unit ?? 1]))
+            )
+            : { gex: null };
+
+        // Live metrics
+        const gridLive = buildContractGrid(symbols, underlying, e);
+        const liveBase = computeSentimentForExpiry(gridLive, priceBySymbolLive, liveIndexPrice, undefined);
+        const liveOi = computeSentimentForExpiry(gridLive, priceBySymbolLive, liveIndexPrice, oiBySymbolLive);
+        const liveRR = computeRR25ForExpiry(gridLive, markBySymbolLive);
+        const liveGex = computeDealerGexForExpiry(
+            gridLive,
+            markBySymbolLive,
+            oiBySymbolLive,
+            liveIndexPrice,
             new Map(symbols.map((s) => [s.symbol, s.unit ?? 1]))
         );
+
         return {
-            label: new Date(e).toLocaleDateString(undefined, { month: "short", day: "2-digit" }),
+            label,
             expiry: e,
-            score: sBase.score,
-            scoreOi: sOi.score,
-            rr25: rr.rr25,
-            gex: gex.gex,
+            score: snapshotBase?.score ?? null,
+            scoreOi: null,
+            rr25: snapshotRR.rr25 ?? null,
+            gex: snapshotGex.gex ?? null,
+            scoreLive: liveBase.score,
+            scoreOiLive: liveOi.score,
+            rr25Live: liveRR.rr25,
+            gexLive: liveGex.gex,
+            priceSnapshot: indexPriceSnapshot ?? null,
+            priceLive: liveIndexPrice,
         };
     });
 
@@ -121,6 +194,9 @@ export default async function CryptoStats({ searchParams }: PageProps) {
                         </p>
                         <h1 className="text-2xl font-semibold leading-tight sm:text-3xl">Binance Options Contract Prices</h1>
                         <p className="text-sm text-muted-foreground">Browse mark prices by strike for calls and puts.</p>
+                        {snapshot ? (
+                            <p className="text-xs text-muted-foreground">Data source: Firestore snapshot at {new Date(snapshot.createdAt).toLocaleString()}.</p>
+                        ) : null}
                     </div>
                     <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                         <span className="font-medium">Underlying:</span>
