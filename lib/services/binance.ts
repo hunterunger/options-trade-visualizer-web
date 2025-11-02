@@ -76,8 +76,8 @@ export const fetchAllMarkPrices = async (): Promise<MarkPriceEntry[]> => {
         next: { revalidate: 5 },
     });
     if (!res.ok) {
-        console.error(`Binance mark prices fetch failed: ${res.status}`);
-        throw new Error(`Binance mark price failed: ${res.status}`,);
+        console.error(`Binance mark prices fetch failed: ${res.status}`, res);
+        throw new Error(`Binance mark price failed: ${res.status}`);
     }
     const json = await res.json();
     const arr: any[] = Array.isArray(json?.data) ? json.data : Array.isArray(json) ? json : [];
