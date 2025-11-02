@@ -73,9 +73,12 @@ export const fetchExchangeInfo = async () => {
 export const fetchAllMarkPrices = async (): Promise<MarkPriceEntry[]> => {
     // Docs: GET /eapi/v1/mark (symbol optional). Without symbol => returns all.
     const res = await fetch(`${BASE_URL}/eapi/v1/mark`, {
-        next: { revalidate: 15 },
+        next: { revalidate: 5 },
     });
-    if (!res.ok) throw new Error(`Binance mark price failed: ${res.status}`);
+    if (!res.ok) {
+        console.error(`Binance mark prices fetch failed: ${res.status}`);
+        throw new Error(`Binance mark price failed: ${res.status}`,);
+    }
     const json = await res.json();
     const arr: any[] = Array.isArray(json?.data) ? json.data : Array.isArray(json) ? json : [];
     return arr
