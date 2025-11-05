@@ -157,11 +157,11 @@ const PriceTimelineChart = ({ points, selectedTimestamp, underlying, expiry, hor
                                         const point = payload.payload as SnapshotTimelinePoint;
                                         const futureLabel = point.futureTimestamp
                                             ? new Date(point.futureTimestamp).toLocaleString(undefined, {
-                                                  month: "short",
-                                                  day: "2-digit",
-                                                  hour: "2-digit",
-                                                  minute: "2-digit",
-                                              })
+                                                month: "short",
+                                                day: "2-digit",
+                                                hour: "2-digit",
+                                                minute: "2-digit",
+                                            })
                                             : horizonLabel;
                                         return [(value * 100).toFixed(1) + "%", `Sentiment Accuracy (${futureLabel})`];
                                     }
