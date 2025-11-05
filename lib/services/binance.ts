@@ -146,29 +146,54 @@ export interface OpenInterestEntry {
     timestamp?: number | null;
 }
 
+const OPEN_INTEREST_TTL_MS = 15 * 60 * 1000; // 15 minutes
+const openInterestCache = new Map<
+    string,
+    {
+        timestamp: number;
+        value: Promise<OpenInterestEntry[]>;
+    }
+>();
+
 export const fetchOpenInterest = async (
     underlyingAsset: string,
     expirationYyMmDd: string
 ): Promise<OpenInterestEntry[]> => {
+    const cacheKey = `${underlyingAsset}:${expirationYyMmDd}`;
+    const now = Date.now();
+    const cached = openInterestCache.get(cacheKey);
+    if (cached && now - cached.timestamp < OPEN_INTEREST_TTL_MS) {
+        return cached.value;
+    }
+
     // Docs: GET /eapi/v1/openInterest?underlyingAsset=ETH&expiration=221225
     const url = new URL(`${BASE_URL}/eapi/v1/openInterest`);
     url.searchParams.set("underlyingAsset", underlyingAsset);
     url.searchParams.set("expiration", expirationYyMmDd);
-    const res = await fetch(url.toString(), { next: { revalidate: 30 } });
-    if (!res.ok) {
-        // If endpoint fails or not supported, return empty gracefully
-        return [];
-    }
-    const json = await res.json();
-    const arr: any[] = Array.isArray(json?.data) ? json.data : Array.isArray(json) ? json : [];
-    return arr
-        .map((d) => ({
-            symbol: d?.symbol as string,
-            sumOpenInterest: toNum(d?.sumOpenInterest) ?? 0,
-            sumOpenInterestUsd: toNum(d?.sumOpenInterestUsd),
-            timestamp: toNum(d?.timestamp),
-        }))
-        .filter((x) => typeof x.symbol === "string");
+    const promise = (async () => {
+        const res = await fetch(url.toString(), { next: { revalidate: 30 } });
+        if (!res.ok) {
+            // If endpoint fails or not supported, return empty gracefully
+            return [];
+        }
+        const json = await res.json();
+        const arr: any[] = Array.isArray(json?.data) ? json.data : Array.isArray(json) ? json : [];
+        return arr
+            .map((d) => ({
+                symbol: d?.symbol as string,
+                sumOpenInterest: toNum(d?.sumOpenInterest) ?? 0,
+                sumOpenInterestUsd: toNum(d?.sumOpenInterestUsd),
+                timestamp: toNum(d?.timestamp),
+            }))
+            .filter((x) => typeof x.symbol === "string");
+    })()
+        .catch((error) => {
+            openInterestCache.delete(cacheKey);
+            throw error;
+        });
+
+    openInterestCache.set(cacheKey, { timestamp: now, value: promise });
+    return promise;
 };
 
 // Helper: format expiryDate (ms) to YYMMDD expected by openInterest endpoint
