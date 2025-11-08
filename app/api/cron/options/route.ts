@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { fetchAllMarkPrices, fetchExchangeInfo, fetchIndexPrice, type MarkPriceEntry, type OptionSymbolInfo } from "@/lib/services/binance";
-import { saveOptionSnapshot } from "@/lib/repositories/option-snapshots";
-import { db } from "@/lib/firebase-admin";
+import { saveOptionSnapshot, saveSnapshotAggregate, type OptionSnapshotDoc } from "@/lib/repositories/option-snapshots";
+import { buildSnapshotAggregate } from "@/lib/aggregations/option-snapshot";
 
 export const dynamic = "force-dynamic";
 // Ensure Node.js runtime (firebase-admin is not supported on the Edge runtime)
@@ -25,7 +25,8 @@ export async function GET() {
         const markMap = new Map(markEntries.map((m) => [m.symbol, m] as const));
 
         const now = Date.now();
-        let saved = 0;
+        let savedSnapshots = 0;
+        let savedAggregates = 0;
         for (const [underlying, list] of byUnderlying.entries()) {
             const expiries = Array.from(new Set(list.map((s) => s.expiryDate))).sort((a, b) => a - b);
             // Index price per underlying
@@ -54,17 +55,30 @@ export async function GET() {
                 };
             });
 
-            await saveOptionSnapshot({
+            const snapshotPayload = {
                 underlying,
                 createdAt: now,
                 indexPrice,
                 expiries,
                 symbols: entries,
-            });
-            saved++;
+            } satisfies Omit<OptionSnapshotDoc, "id">;
+
+            const snapshotId = await saveOptionSnapshot(snapshotPayload);
+            savedSnapshots++;
+
+            try {
+                const aggregate = buildSnapshotAggregate({
+                    ...snapshotPayload,
+                    id: snapshotId,
+                });
+                await saveSnapshotAggregate(underlying, aggregate);
+                savedAggregates++;
+            } catch (aggregateError) {
+                console.error(`Failed to build aggregate for ${underlying} @ ${now}`, aggregateError);
+            }
         }
 
-        return NextResponse.json({ ok: true, saved, underlyings: byUnderlying.size });
+        return NextResponse.json({ ok: true, savedSnapshots, savedAggregates, underlyings: byUnderlying.size });
     } catch (e: any) {
         return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 });
     }
