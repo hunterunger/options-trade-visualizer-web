@@ -14,3 +14,5 @@ if (!admin.apps.length && projectId && clientEmail && privateKey) {
 }
 
 export const db = admin.firestore();
+
+export const getDb = () => db;

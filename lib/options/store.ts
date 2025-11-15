@@ -1,5 +1,5 @@
 import { Timestamp, type QueryDocumentSnapshot } from "firebase-admin/firestore";
-import { getDb } from "@/lib/firebase/admin";
+import { getDb } from "@/lib/firebase-admin";
 import {
     optionAggregateSchema,
     optionContractSchema,
