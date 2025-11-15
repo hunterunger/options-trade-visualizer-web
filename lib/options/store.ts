@@ -81,13 +81,13 @@ const mapSnapshotData = (doc: QueryDocumentSnapshot): OptionSnapshot => {
         indexPrice: normalizeNumeric(data.indexPrice) ?? 0,
         expiries: Array.isArray(data.expiries)
             ? data.expiries
-                  .map((expiry: unknown) => normalizeNumeric(expiry))
-                  .filter((value: number | null): value is number => value !== null)
+                .map((expiry: unknown) => normalizeNumeric(expiry))
+                .filter((value: number | null): value is number => value !== null)
             : [],
         symbols: Array.isArray(data.symbols)
             ? data.symbols
-                  .map((symbol: Record<string, unknown>) => mapOptionContract(symbol))
-                  .filter((contract): contract is NonNullable<typeof contract> => contract !== null)
+                .map((symbol: Record<string, unknown>) => mapOptionContract(symbol))
+                .filter((contract): contract is NonNullable<typeof contract> => contract !== null)
             : [],
     };
 
@@ -102,25 +102,25 @@ const mapAggregateData = (doc: QueryDocumentSnapshot): OptionAggregate => {
         indexPrice: normalizeNumeric(data.indexPrice),
         expiries: Array.isArray(data.expiries)
             ? data.expiries.map((entry: Record<string, unknown>) => ({
-                  ...entry,
-                  expiry: normalizeNumeric(entry.expiry) ?? 0,
-                  baseline:
-                      entry.baseline === null || entry.baseline === undefined
-                          ? null
-                          : normalizeNumeric(entry.baseline),
-                  rr25:
-                      entry.rr25 === null || entry.rr25 === undefined
-                          ? null
-                          : normalizeNumeric(entry.rr25),
-                  price:
-                      entry.price === null || entry.price === undefined
-                          ? null
-                          : normalizeNumeric(entry.price),
-                  strikesConsidered:
-                      entry.strikesConsidered === null || entry.strikesConsidered === undefined
-                          ? undefined
-                          : normalizeNumeric(entry.strikesConsidered) ?? undefined,
-              }))
+                ...entry,
+                expiry: normalizeNumeric(entry.expiry) ?? 0,
+                baseline:
+                    entry.baseline === null || entry.baseline === undefined
+                        ? null
+                        : normalizeNumeric(entry.baseline),
+                rr25:
+                    entry.rr25 === null || entry.rr25 === undefined
+                        ? null
+                        : normalizeNumeric(entry.rr25),
+                price:
+                    entry.price === null || entry.price === undefined
+                        ? null
+                        : normalizeNumeric(entry.price),
+                strikesConsidered:
+                    entry.strikesConsidered === null || entry.strikesConsidered === undefined
+                        ? undefined
+                        : normalizeNumeric(entry.strikesConsidered) ?? undefined,
+            }))
             : [],
         metadata: data.metadata,
     };
