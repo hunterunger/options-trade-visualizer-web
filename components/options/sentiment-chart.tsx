@@ -83,7 +83,7 @@ const SentimentChart = ({ title = "Options Sentiment by Expiry", points }: Senti
                         <ReferenceLine y={0} yAxisId="left" stroke="#8884d8" strokeDasharray="3 3" />
                         <Legend verticalAlign="top" height={24} />
                         {hasSnapshotBaseline ? (
-                            <Line yAxisId="left" name="Baseline (snapshot)" type="linear" dataKey="score" stroke="#22c55e" strokeWidth={2} dot={{ r: 3 }} />
+                            <Line yAxisId="left" name="Baseline (snapshot)" type="linear" dataKey="score" stroke="#22c55e" strokeWidth={2} dot={false} />
                         ) : null}
                         {hasLiveBaseline ? (
                             <Line
@@ -98,7 +98,7 @@ const SentimentChart = ({ title = "Options Sentiment by Expiry", points }: Senti
                             />
                         ) : null}
                         {hasSnapshotOi ? (
-                            <Line yAxisId="left" name="OI-weighted (snapshot)" type="linear" dataKey="scoreOi" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} />
+                            <Line yAxisId="left" name="OI-weighted (snapshot)" type="linear" dataKey="scoreOi" stroke="#f59e0b" strokeWidth={2} dot={false} />
                         ) : null}
                         {hasLiveOi ? (
                             <Line
@@ -113,7 +113,7 @@ const SentimentChart = ({ title = "Options Sentiment by Expiry", points }: Senti
                             />
                         ) : null}
                         {hasSnapshotRr ? (
-                            <Line yAxisId="left" name="RR25 (snapshot)" type="linear" dataKey="rr25" stroke="#06b6d4" strokeWidth={2} dot={{ r: 2 }} />
+                            <Line yAxisId="left" name="RR25 (snapshot)" type="linear" dataKey="rr25" stroke="#06b6d4" strokeWidth={2} dot={false} />
                         ) : null}
                         {hasLiveRr ? (
                             <Line
@@ -135,7 +135,7 @@ const SentimentChart = ({ title = "Options Sentiment by Expiry", points }: Senti
                                 dataKey="priceSnapshot"
                                 stroke="#64748b"
                                 strokeWidth={2}
-                                dot={{ r: 2 }}
+                                dot={false}
                             />
                         ) : null}
                         {hasLivePrice ? (

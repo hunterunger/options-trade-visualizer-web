@@ -174,15 +174,15 @@ const PriceTimelineChart = ({ points, selectedTimestamp, underlying, expiry, hor
                         {selectedPoint ? (
                             <ReferenceLine x={selectedPoint.iso} yAxisId="sentiment" stroke="#22c55e" strokeDasharray="6 4" />
                         ) : null}
-                        <Line type="linear" yAxisId="sentiment" dataKey="baseline" stroke="#22c55e" dot={{ r: 2 }} strokeWidth={2} connectNulls />
-                        <Line type="linear" yAxisId="sentiment" dataKey="rr25" stroke="#0ea5e9" dot={{ r: 2 }} strokeWidth={2} connectNulls />
+                        <Line type="linear" yAxisId="sentiment" dataKey="baseline" stroke="#22c55e" dot={false} strokeWidth={2} connectNulls />
+                        <Line type="linear" yAxisId="sentiment" dataKey="rr25" stroke="#0ea5e9" dot={false} strokeWidth={2} connectNulls />
                         <Line
                             type="linear"
                             yAxisId="sentiment"
                             dataKey="sentimentAlignment"
                             stroke="#a855f7"
                             strokeWidth={2}
-                            dot={{ r: 2 }}
+                            dot={false}
                             connectNulls
                         />
                         <Line
@@ -195,7 +195,7 @@ const PriceTimelineChart = ({ points, selectedTimestamp, underlying, expiry, hor
                             dot={false}
                             connectNulls
                         />
-                        <Line type="linear" yAxisId="price" dataKey="price" stroke="#64748b" strokeWidth={2} dot={{ r: 1.8 }} connectNulls />
+                        <Line type="linear" yAxisId="price" dataKey="price" stroke="#64748b" strokeWidth={2} dot={false} connectNulls />
                     </LineChart>
                 </ResponsiveContainer>
             </CardContent>
