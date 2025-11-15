@@ -144,11 +144,11 @@ export const requestJupiterOrder = async (
 
         const routeSummary = Array.isArray(data.routePlan)
             ? data.routePlan.map((entry: any) => ({
-                  label: entry.marketMeta?.label ?? entry.marketLabel ?? "Unknown",
-                  inputMint: entry.inputMint ?? "",
-                  outputMint: entry.outputMint ?? "",
-                  percent: typeof entry.percent === "number" ? entry.percent : 0,
-              }))
+                label: entry.marketMeta?.label ?? entry.marketLabel ?? "Unknown",
+                inputMint: entry.inputMint ?? "",
+                outputMint: entry.outputMint ?? "",
+                percent: typeof entry.percent === "number" ? entry.percent : 0,
+            }))
             : [];
 
         const result: JupiterOrderSuccess = {
